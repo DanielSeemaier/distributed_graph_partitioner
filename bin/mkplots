@@ -69,7 +69,7 @@ cat(paste0("File suffix: ", filename_suffix, "\n"))
 cat("\n")
 
 all_plots <- c(
-  "--all-cut", "--pairwise-cut", "--per-k-cut", "--per-eps-cut", "--per-graph-type-cut",
+  "--all-cut", "--pairwise-cut", "--per-k-cut", "--per-eps-cut", "--per-graph-type-cut", "--per-graph-type-time",
   "--all-time",
   "--per-instance",
   "--graph-stats"
@@ -137,6 +137,7 @@ for (algorithm in algorithms) {
   cat(paste0("\tks = { ", paste(my_ks, collapse = ", "), " }\n"))
   cat(paste0("\teps = { ", paste(my_eps, collapse = ", "), " }\n"))
   cat(paste0("\t#graphs = ", length(my_graphs), "\n"))
+  df %>% dplyr::filter(Infeasible) %>% dplyr::select(Graph, K) %>% print()
 
   # Split dataset into one algorithm for each thread count
   for (num_threads in unique(df$NumThreadsPerMPI)) {
@@ -338,7 +339,7 @@ if ("--all-time" %in% plots) {
   all_running_times <- aggregate_running_times(data)
   all_running_times_annotation <- data.frame(
     Algorithm = all_running_times$Algorithm,
-    Annotation = sprintf("h=%.2f, g=%.2f, a=%.2f", all_running_times$Hmean, all_running_times$Gmean, all_running_times$Mean)
+    Annotation = sprintf("h=%.3f, g=%.3f, a=%.3f", all_running_times$Hmean, all_running_times$Gmean, all_running_times$Mean)
   )
 
   plot <- do.call(create_running_time_boxplot, c(data, list(annotation = all_running_times_annotation))) +
@@ -371,6 +372,40 @@ if ("--all-time" %in% plots) {
         title = paste0("Total Running Times for k = ", k),
         caption = paste0("#graphs = ", length(common_graphs), ", #ks = 1")
       )
+    print(plot)
+  }
+
+  dev.off()
+}
+
+if ("--per-graph-type-time" %in% plots) {
+  running_time_plot_theme <- create_theme() + theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+  )
+
+  mkpdf("per_graph_type_running_time")
+  for (type in common_graph_types) {
+    type_data <- list()
+    for (df in data) {
+      type_df <- df %>% dplyr::filter(GraphType == type)
+      type_data <- append(type_data, list(type_df))
+    }
+
+    type_running_times <- aggregate_running_times(type_data)
+    type_running_times_annotation <- data.frame(
+        Algorithm = type_running_times$Algorithm,
+        Annotation = sprintf("h=%.3f, g=%.3f, a=%.3f", type_running_times$Hmean, type_running_times$Gmean, type_running_times$Mean)
+    )
+
+    type_graphs <- unique(type_data[[1]]$Graph)
+    plot <- do.call(create_running_time_boxplot, c(type_data, list(annotation = type_running_times_annotation))) +
+        theme_bw() +
+        running_time_plot_theme +
+        labs(
+            title = paste0("Running Times for ", type, " Graphs"),
+            caption = paste0("#graphs = ", length(type_graphs), ", #ks = 1")
+        )
     print(plot)
   }
 
